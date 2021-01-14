@@ -2,23 +2,31 @@
 #include <vector>
 #include <fstream>
 #include <random>
+#include <ctime>
+#include <map>
+#include <set>
 
 using namespace std;
 
 vector<vector<int>> generateGraph(long long numOfVertices, long long numOfEdges);
 vector<vector<int>> generateGraph(long long numOfVertices);
-void generateDot(const vector<vector<int>> &graph);
+void generateDot(const vector<vector<int>> &graph, const string& filename);
+vector<vector<int>> getSubgraph(const vector<vector<int>> &graph, long long first, long long numOfEdges);
+vector<vector<int>> gs(const vector<vector<int>> &graph, long long first, long long numOfEdges);
+vector<vector<int>> validSubgraph(const vector<vector<int>> &graphs);
 
 int main() {
     const long long NUM_OF_VERTICES = 10;
     vector<vector<int>> graph = generateGraph(NUM_OF_VERTICES);
-    generateDot(graph);
+    generateDot(graph, "graph.dot");
+    vector<vector<int>> subgraph = getSubgraph(graph, 1, 7);
+    generateDot(subgraph, "subgraph.dot");
     return 0;
 }
 
 vector<vector<int>> generateGraph(long long numOfVertices, long long numOfEdges) {
     random_device rd;
-    mt19937 gen(rd());
+    mt19937 gen(rd() + (unsigned) time(nullptr));
     vector<vector<int>> graph;
 
     vector<int> g;
@@ -35,6 +43,7 @@ vector<vector<int>> generateGraph(long long numOfVertices, long long numOfEdges)
         tryAgain:
         long long currVert = gen() % numOfVertices;
         long long currEdge = gen() % numOfVertices;
+
         if (graph[currVert][currEdge] == 0) {
             graph[currVert][currEdge] = 1;
             graph[currEdge][currVert] = 1;
@@ -51,18 +60,20 @@ vector<vector<int>> generateGraph(long long numOfVertices) {
     return generateGraph(numOfVertices, numOfEdges);
 }
 
-void generateDot(const vector<vector<int>> &graph) {
-    ofstream fileOut("graph.dot");
+void generateDot(const vector<vector<int>> &graph, const string& filename) {
+    ofstream fileOut(filename);
     fileOut << "graph {\n";
     long long len = graph.size();
 
     for (long long i = 0; i < len; ++i) {
         string str = "    " + to_string(i) + " -- ";
+
         for (long long ii = i; ii < len; ++ii) {
             if (graph[i][ii]) {
                 str += std::to_string(ii) + ", ";
             }
         }
+
         if (str[str.size() - 2] == '-') {
             for (int j = 0; j < 4; ++j)
                 str.pop_back();
@@ -74,5 +85,70 @@ void generateDot(const vector<vector<int>> &graph) {
     }
 
     fileOut << '}';
+}
+
+vector<vector<int>> getSubgraph(const vector<vector<int>> &graph, long long int first, long long int numOfEdges) {
+    random_device rd;
+    mt19937 gen(rd() + (unsigned) time(nullptr));
+    vector<vector<int>> subgraph, subgraphs = gs(graph, first, numOfEdges);
+
+    if (!subgraphs.empty()) {
+        vector<int> g = subgraphs[gen() % subgraphs.size()];
+        map<int, int> m;
+
+        for (int &i : g) {
+            if (m.count(i) == 0) {
+                int sz = m.size();
+                m.insert(pair<int, int>(i, sz));
+            }
+        }
+
+        vector<int> ng(m.size());
+
+        for (int i = 0; i < m.size(); ++i) {
+            subgraph.push_back(ng);
+        }
+
+        for (int &i : g) {
+            i = m[i];
+        }
+
+        for (int i = 0; i < g.size() - 1; i++) {
+            subgraph[g[i]][g[i + 1]] = 1;
+            subgraph[g[i + 1]][g[i]] = 1;
+        }
+
+        return subgraph;
+    } else {
+        return static_cast<vector<vector<int>>>(0);
+    }
+}
+
+vector<vector<int>> gs(const vector<vector<int>> &graph, long long int first, long long int numOfEdges) {
+    vector<vector<int>> subgraphs, bufSubgraphs;
+
+    if (numOfEdges == 1) {
+        vector<int> g;
+        g.push_back(first);
+        subgraphs.push_back(g);
+    } else {
+        for (int i = 0; i < graph.size(); ++i) {
+            if (graph[first][i]) {
+                bufSubgraphs = gs(graph, i, numOfEdges - 1);
+                subgraphs.insert(subgraphs.end(), bufSubgraphs.begin(), bufSubgraphs.end());
+            }
+        }
+
+        bufSubgraphs = subgraphs;
+        subgraphs.clear();
+
+        for (int i = 0; i < bufSubgraphs.size(); ++i) {
+            vector<int> buf;
+            buf.push_back(first);
+            buf.insert(buf.end(), subgraphs[i].begin(), subgraphs[i].end());
+            subgraphs.push_back(buf);
+        }
+    }
+    return subgraphs;
 }
 
