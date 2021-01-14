@@ -19,7 +19,7 @@ int main() {
     const long long NUM_OF_VERTICES = 10;
     vector<vector<int>> graph = generateGraph(NUM_OF_VERTICES);
     generateDot(graph, "graph.dot");
-    vector<vector<int>> subgraph = getSubgraph(graph, 1, 7);
+    vector<vector<int>> subgraph = getSubgraph(graph, 1, 10);
     generateDot(subgraph, "subgraph.dot");
     return 0;
 }
@@ -90,8 +90,9 @@ void generateDot(const vector<vector<int>> &graph, const string& filename) {
 vector<vector<int>> getSubgraph(const vector<vector<int>> &graph, long long int first, long long int numOfEdges) {
     random_device rd;
     mt19937 gen(rd() + (unsigned) time(nullptr));
+    numOfEdges++;
     vector<vector<int>> subgraph, subgraphs = gs(graph, first, numOfEdges);
-
+    subgraphs = validSubgraph(subgraphs);
     if (!subgraphs.empty()) {
         vector<int> g = subgraphs[gen() % subgraphs.size()];
         map<int, int> m;
@@ -142,13 +143,31 @@ vector<vector<int>> gs(const vector<vector<int>> &graph, long long int first, lo
         bufSubgraphs = subgraphs;
         subgraphs.clear();
 
-        for (int i = 0; i < bufSubgraphs.size(); ++i) {
+        for (auto & bufSubgraph : bufSubgraphs) {
             vector<int> buf;
             buf.push_back(first);
-            buf.insert(buf.end(), subgraphs[i].begin(), subgraphs[i].end());
+            buf.insert(buf.end(), bufSubgraph.begin(), bufSubgraph.end());
             subgraphs.push_back(buf);
         }
     }
     return subgraphs;
 }
 
+vector<vector<int>> validSubgraph(const vector<vector<int>> &graphs) {
+    vector<vector<int>> validatedGraphs;
+
+    for (auto curr : graphs) {
+        set<string> s;
+
+        for (int i = 0; i < curr.size() - 1; ++i) {
+            s.insert(to_string(curr[i]) + '-' + to_string(curr[i + 1]));
+            s.insert(to_string(curr[i + 1]) + '-' + to_string(curr[i]));
+        }
+
+        if (s.size() > (curr.size() - 2) * 2) {
+            validatedGraphs.push_back(curr);
+        }
+    }
+
+    return validatedGraphs;
+}
