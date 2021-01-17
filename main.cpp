@@ -34,7 +34,7 @@ int main() {
     tm = omp_get_wtime();
     vector<vector<vector<int>>> subgraphs = getSubgraphs(graph, 8);
 
-
+/*
     if(iAmDolban){
         for(int i = 0 ; i < subgraphs.size() ; i++){
         string s="allSubgraphs/Subgraph ",numb;
@@ -46,7 +46,8 @@ int main() {
         generateDot(subgraphs[i], s);
         }
     }
-
+*/
+    cout << searchSubgraph(subgraphs,subgraph)<<"\n";
     cout << (double)((long long)((omp_get_wtime() - tm) * 10)) / 10 << " s" << endl;
     return 0;
 }
@@ -104,9 +105,9 @@ void generateDot(const vector<vector<int>> &graph, const string& filename) {
         if (str[str.size() - 2] == '-') {
             for (int j = 0; j < 4; ++j)
                 str.pop_back();
-            fileOut << str << ";\n";
+            //fileOut << str << ";\n";
         } else {
-            str[str.size() - 2] = ';';
+             str[str.size() - 2] = ';';
             fileOut << str << endl;
         }
     }
@@ -116,10 +117,13 @@ void generateDot(const vector<vector<int>> &graph, const string& filename) {
 
 vector<vector<vector<int>>> getSubgraphs(const vector<vector<int>> &graph, long long int numOfEdges) {
     set<vector<vector<int>>> out;
+    ///todo отличное место для распарралеливания
+#pragma omp parallel for num_threads(4)
     for (int i = 0; i < graph.size(); ++i) {
         vector<vector<int>> subgraphs = gs(graph, i, numOfEdges + 1);
         subgraphs = validSubgraph(subgraphs);
         if (!subgraphs.empty()) {
+#pragma omp critical
             for (auto g : subgraphs) {
                 out.insert(normalize(g));
             }
@@ -204,7 +208,7 @@ vector<vector<int>> gs(const vector<vector<int>> &graph, long long int first, lo
         g.push_back(first);
         subgraphs.push_back(g);
     } else {
-        for (int i = graph.size() ; i > 0; --i) {
+        for (int i = 0 ; i < graph.size() ; ++i) {
             if (graph[first][i]) {
                 bufSubgraphs = gs(graph, i, numOfEdges - 1);
                 subgraphs.insert(subgraphs.end(), bufSubgraphs.begin(), bufSubgraphs.end());
@@ -244,9 +248,19 @@ vector<vector<int>> validSubgraph(const vector<vector<int>> &graphs) {
 }
 
 bool searchSubgraph(vector<vector<vector<int>>> allSubgraphs, vector<vector<int>> neededSubgraphs) {
-    for (auto subgraph : allSubgraphs) {
-        if (subgraph==neededSubgraphs)
-            return true;
+bool check=false;
+#pragma omp parallel num_threads(4) shared(check)
+{
+    unsigned long id = omp_get_thread_num ( );
+    cout << id<<" ";
+    int left = id * allSubgraphs.size() / 4;
+    int right = (id + 1) * allSubgraphs.size() / 4;
+    for(int i = left ; i < right; i++ )
+    if (allSubgraphs[i]==neededSubgraphs){
+        check=true;
+        break;
     }
-    return false;
+}
+
+    return check;
 }
