@@ -12,7 +12,7 @@ using namespace std;
 vector<vector<int>> generateGraph(long long numOfVertices, long long numOfEdges);
 vector<vector<int>> generateGraph(long long numOfVertices);
 void generateDot(const vector<vector<int>> &graph, const string& filename);
-vector<vector<vector<int>>> getSubgraphs(const vector<vector<int>> &graph, long long int first, long long int numOfEdges);
+vector<vector<vector<int>>> getSubgraphs(const vector<vector<int>> &graph, long long int numOfEdges);
 vector<vector<int>> getSubgraph(const vector<vector<int>> &graph, long long first, long long numOfEdges);
 vector<vector<int>> gs(const vector<vector<int>> &graph, long long first, long long numOfEdges);
 vector<vector<int>> validSubgraph(const vector<vector<int>> &graphs);
@@ -23,8 +23,12 @@ int main() {
     const long long NUM_OF_VERTICES = 12;
     vector<vector<int>> graph = generateGraph(NUM_OF_VERTICES);
     generateDot(graph, "graph.dot");
-    vector<vector<int>> subgraph = getSubgraph(graph, 1, 8);
+    vector<vector<int>> subgraph = getSubgraph(graph, 1, 6);
     generateDot(subgraph, "subgraph.dot");
+    cout << (double)((long long)((omp_get_wtime() - tm) * 10)) / 10 << " s" << endl;
+
+    tm = omp_get_wtime();
+    vector<vector<vector<int>>> subgraphs = getSubgraphs(graph, 8);
     cout << (double)((long long)((omp_get_wtime() - tm) * 10)) / 10 << " s" << endl;
     return 0;
 }
@@ -92,17 +96,22 @@ void generateDot(const vector<vector<int>> &graph, const string& filename) {
     fileOut << '}';
 }
 
-vector<vector<vector<int>>> getSubgraphs(const vector<vector<int>> &graph, long long int first, long long int numOfEdges) {
-    vector<vector<int>> subgraphs = gs(graph, first, numOfEdges + 1);
-    vector<vector<vector<int>>> out;
-    subgraphs = validSubgraph(subgraphs);
-    if (!subgraphs.empty()) {
-        for (auto g : subgraphs) {
-            out.push_back(normalize(g));
+vector<vector<vector<int>>> getSubgraphs(const vector<vector<int>> &graph, long long int numOfEdges) {
+    set<vector<vector<int>>> out;
+    for (int i = 0; i < graph.size(); ++i) {
+        vector<vector<int>> subgraphs = gs(graph, i, numOfEdges + 1);
+        subgraphs = validSubgraph(subgraphs);
+        if (!subgraphs.empty()) {
+            for (auto g : subgraphs) {
+                out.insert(normalize(g));
+            }
         }
-        return out;
-    } else {
+    }
+    if (out.empty()) {
         return static_cast<vector<vector<vector<int>>>>(0);
+    } else {
+        vector<vector<vector<int>>> v (out.begin(), out.end());
+        return v;
     }
 }
 
