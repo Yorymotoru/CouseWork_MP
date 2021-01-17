@@ -5,22 +5,27 @@
 #include <ctime>
 #include <map>
 #include <set>
+#include <omp.h>
 
 using namespace std;
 
 vector<vector<int>> generateGraph(long long numOfVertices, long long numOfEdges);
 vector<vector<int>> generateGraph(long long numOfVertices);
 void generateDot(const vector<vector<int>> &graph, const string& filename);
+vector<vector<vector<int>>> getSubgraphs(const vector<vector<int>> &graph, long long int first, long long int numOfEdges);
 vector<vector<int>> getSubgraph(const vector<vector<int>> &graph, long long first, long long numOfEdges);
 vector<vector<int>> gs(const vector<vector<int>> &graph, long long first, long long numOfEdges);
 vector<vector<int>> validSubgraph(const vector<vector<int>> &graphs);
+vector<vector<int>> normalize(vector<int> &g);
 
 int main() {
-    const long long NUM_OF_VERTICES = 10;
+    double tm = omp_get_wtime();
+    const long long NUM_OF_VERTICES = 12;
     vector<vector<int>> graph = generateGraph(NUM_OF_VERTICES);
     generateDot(graph, "graph.dot");
-    vector<vector<int>> subgraph = getSubgraph(graph, 1, 10);
+    vector<vector<int>> subgraph = getSubgraph(graph, 1, 8);
     generateDot(subgraph, "subgraph.dot");
+    cout << (double)((long long)((omp_get_wtime() - tm) * 10)) / 10 << " s" << endl;
     return 0;
 }
 
@@ -87,42 +92,62 @@ void generateDot(const vector<vector<int>> &graph, const string& filename) {
     fileOut << '}';
 }
 
+vector<vector<vector<int>>> getSubgraphs(const vector<vector<int>> &graph, long long int first, long long int numOfEdges) {
+    vector<vector<int>> subgraphs = gs(graph, first, numOfEdges + 1);
+    vector<vector<vector<int>>> out;
+    subgraphs = validSubgraph(subgraphs);
+    if (!subgraphs.empty()) {
+        for (auto g : subgraphs) {
+            out.push_back(normalize(g));
+        }
+        return out;
+    } else {
+        return static_cast<vector<vector<vector<int>>>>(0);
+    }
+}
+
 vector<vector<int>> getSubgraph(const vector<vector<int>> &graph, long long int first, long long int numOfEdges) {
     random_device rd;
     mt19937 gen(rd() + (unsigned) time(nullptr));
-    numOfEdges++;
-    vector<vector<int>> subgraph, subgraphs = gs(graph, first, numOfEdges);
+    vector<vector<int>> subgraphs = gs(graph, first, numOfEdges + 1);
     subgraphs = validSubgraph(subgraphs);
     if (!subgraphs.empty()) {
         vector<int> g = subgraphs[gen() % subgraphs.size()];
-        map<int, int> m;
-
-        for (int &i : g) {
-            if (m.count(i) == 0) {
-                int sz = m.size();
-                m.insert(pair<int, int>(i, sz));
-            }
-        }
-
-        vector<int> ng(m.size());
-
-        for (int i = 0; i < m.size(); ++i) {
-            subgraph.push_back(ng);
-        }
-
-        for (int &i : g) {
-            i = m[i];
-        }
-
-        for (int i = 0; i < g.size() - 1; i++) {
-            subgraph[g[i]][g[i + 1]] = 1;
-            subgraph[g[i + 1]][g[i]] = 1;
-        }
+        vector<vector<int>> subgraph = normalize(g);
 
         return subgraph;
     } else {
         return static_cast<vector<vector<int>>>(0);
     }
+}
+
+vector<vector<int>> normalize(vector<int> &g) {
+    map<int, int> m;
+    vector<vector<int>> subgraph;
+
+    for (int &i : g) {
+        if (m.count(i) == 0) {
+            int sz = m.size();
+            m.insert(pair<int, int>(i, sz));
+        }
+    }
+
+    vector<int> ng(m.size());
+
+    subgraph.reserve(m.size());
+    for (int i = 0; i < m.size(); ++i) {
+        subgraph.push_back(ng);
+    }
+
+    for (int &i : g) {
+        i = m[i];
+    }
+
+    for (int i = 0; i < g.size() - 1; i++) {
+        subgraph[g[i]][g[i + 1]] = 1;
+        subgraph[g[i + 1]][g[i]] = 1;
+    }
+    return subgraph;
 }
 
 vector<vector<int>> gs(const vector<vector<int>> &graph, long long int first, long long int numOfEdges) {
