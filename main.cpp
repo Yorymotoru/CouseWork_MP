@@ -6,6 +6,7 @@
 #include <map>
 #include <set>
 #include <omp.h>
+#include <sstream>
 
 using namespace std;
 
@@ -14,9 +15,12 @@ vector<vector<int>> generateGraph(long long numOfVertices);
 void generateDot(const vector<vector<int>> &graph, const string& filename);
 vector<vector<vector<int>>> getSubgraphs(const vector<vector<int>> &graph, long long int numOfEdges);
 vector<vector<int>> getSubgraph(const vector<vector<int>> &graph, long long first, long long numOfEdges);
+bool searchSubgraph(vector<vector<vector<int>>> allSubgraphs, vector<vector<int>> neededSubgraphs);
 vector<vector<int>> gs(const vector<vector<int>> &graph, long long first, long long numOfEdges);
 vector<vector<int>> validSubgraph(const vector<vector<int>> &graphs);
 vector<vector<int>> normalize(vector<int> &g);
+
+bool iAmDolban = true;//help me!
 
 int main() {
     double tm = omp_get_wtime();
@@ -29,6 +33,20 @@ int main() {
 
     tm = omp_get_wtime();
     vector<vector<vector<int>>> subgraphs = getSubgraphs(graph, 8);
+
+
+    if(iAmDolban){
+        for(int i = 0 ; i < subgraphs.size() ; i++){
+        string s="allSubgraphs/Subgraph ",numb;
+        stringstream ss;
+        ss<<(i);
+        ss>>numb;
+        s+=numb;
+        s+=".dot";
+        generateDot(subgraphs[i], s);
+        }
+    }
+
     cout << (double)((long long)((omp_get_wtime() - tm) * 10)) / 10 << " s" << endl;
     return 0;
 }
@@ -131,30 +149,47 @@ vector<vector<int>> getSubgraph(const vector<vector<int>> &graph, long long int 
 }
 
 vector<vector<int>> normalize(vector<int> &g) {
-    map<int, int> m;
     vector<vector<int>> subgraph;
+    if (!iAmDolban) {
+        map<int, int> m;
 
-    for (int &i : g) {
-        if (m.count(i) == 0) {
-            int sz = m.size();
-            m.insert(pair<int, int>(i, sz));
+
+        for (int &i : g) {
+            if (m.count(i) == 0) {
+                int sz = m.size();
+                m.insert(pair<int, int>(i, sz));
+            }
         }
-    }
 
-    vector<int> ng(m.size());
+        vector<int> ng(m.size());
 
-    subgraph.reserve(m.size());
-    for (int i = 0; i < m.size(); ++i) {
-        subgraph.push_back(ng);
-    }
+        subgraph.reserve(m.size());
+        for (int i = 0; i < m.size(); ++i) {
+            subgraph.push_back(ng);
+        }
 
-    for (int &i : g) {
-        i = m[i];
-    }
+        for (int &i : g) {
+            i = m[i];
+        }
 
-    for (int i = 0; i < g.size() - 1; i++) {
-        subgraph[g[i]][g[i + 1]] = 1;
-        subgraph[g[i + 1]][g[i]] = 1;
+        for (int i = 0; i < g.size() - 1; i++) {
+            subgraph[g[i]][g[i + 1]] = 1;
+            subgraph[g[i + 1]][g[i]] = 1;
+        }
+
+    }else{//  I am so sorry
+        int _max=0;
+        for(int i = 0; i < g.size(); i++)
+            _max=max(_max,g[i]);
+        vector<int> ng(_max+1);
+        for (int i = 0; i < _max+1; ++i) {
+            subgraph.push_back(ng);
+        }
+        for (int i = 0; i < g.size() - 1; i++) {
+            subgraph[g[i]][g[i + 1]] = 1;
+            subgraph[g[i + 1]][g[i]] = 1;
+        }
+        int y =  9  ;
     }
     return subgraph;
 }
@@ -204,4 +239,12 @@ vector<vector<int>> validSubgraph(const vector<vector<int>> &graphs) {
     }
 
     return validatedGraphs;
+}
+
+bool searchSubgraph(vector<vector<vector<int>>> allSubgraphs, vector<vector<int>> neededSubgraphs) {
+    for (auto subgraph : allSubgraphs) {
+        if (subgraph==neededSubgraphs)
+            return true;
+    }
+    return false;
 }
