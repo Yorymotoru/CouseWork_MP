@@ -181,7 +181,9 @@ vector<vector<int>> normalize(vector<int> &g) {
         int _max=0;
         for(int i = 0; i < g.size(); i++)
             _max=max(_max,g[i]);
+
         vector<int> ng(_max+1);
+        subgraph.reserve(_max+1);
         for (int i = 0; i < _max+1; ++i) {
             subgraph.push_back(ng);
         }
@@ -202,7 +204,7 @@ vector<vector<int>> gs(const vector<vector<int>> &graph, long long int first, lo
         g.push_back(first);
         subgraphs.push_back(g);
     } else {
-        for (int i = 0; i < graph.size(); ++i) {
+        for (int i = graph.size() ; i > 0; --i) {
             if (graph[first][i]) {
                 bufSubgraphs = gs(graph, i, numOfEdges - 1);
                 subgraphs.insert(subgraphs.end(), bufSubgraphs.begin(), bufSubgraphs.end());
