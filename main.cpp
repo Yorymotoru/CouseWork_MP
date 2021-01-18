@@ -16,6 +16,7 @@ void generateDot(const vector<vector<int>> &graph, const string& filename);
 vector<vector<vector<int>>> getSubgraphs(const vector<vector<int>> &graph, long long int numOfEdges);
 vector<vector<int>> getSubgraph(const vector<vector<int>> &graph, long long first, long long numOfEdges);
 bool searchSubgraph(vector<vector<vector<int>>> allSubgraphs, vector<vector<int>> neededSubgraphs);
+bool compareSubgraph(vector<vector<int>> subgraph1, vector<vector<int>> subgraph2);
 vector<vector<int>> gs(const vector<vector<int>> &graph, long long first, long long numOfEdges);
 vector<vector<int>> validSubgraph(const vector<vector<int>> &graphs);
 vector<vector<int>> normalize(vector<int> &g);
@@ -32,9 +33,9 @@ int main() {
     cout << (double)((long long)((omp_get_wtime() - tm) * 10)) / 10 << " s" << endl;
 
     tm = omp_get_wtime();
-    vector<vector<vector<int>>> subgraphs = getSubgraphs(graph, 8);
+    vector<vector<vector<int>>> subgraphs = getSubgraphs(graph, 6);
 
-/*
+
     if(iAmDolban){
         for(int i = 0 ; i < subgraphs.size() ; i++){
         string s="allSubgraphs/Subgraph ",numb;
@@ -46,7 +47,7 @@ int main() {
         generateDot(subgraphs[i], s);
         }
     }
-*/
+
     cout << searchSubgraph(subgraphs,subgraph)<<"\n";
     cout << (double)((long long)((omp_get_wtime() - tm) * 10)) / 10 << " s" << endl;
     return 0;
@@ -249,18 +250,36 @@ vector<vector<int>> validSubgraph(const vector<vector<int>> &graphs) {
 
 bool searchSubgraph(vector<vector<vector<int>>> allSubgraphs, vector<vector<int>> neededSubgraphs) {
 bool check=false;
-#pragma omp parallel num_threads(4) shared(check)
-{
-    unsigned long id = omp_get_thread_num ( );
-    cout << id<<" ";
-    int left = id * allSubgraphs.size() / 4;
-    int right = (id + 1) * allSubgraphs.size() / 4;
-    for(int i = left ; i < right; i++ )
-    if (allSubgraphs[i]==neededSubgraphs){
+///todo отличное место для распарралеливания
+///todo херач фор и забей
+#pragma omp parallel for num_threads(4) shared(check)
+
+    for(int i = 0 ; i < allSubgraphs.size(); i++ )
+    if (compareSubgraph(allSubgraphs[i],neededSubgraphs)){
         check=true;
-        break;
     }
+
+
+    return check;
 }
 
+bool compareSubgraph(vector<vector<int>> subgraph1, vector<vector<int>> subgraph2) {
+   bool check=true;
+    vector<int>  buf(max(subgraph1.size(),subgraph2.size()),0);
+    subgraph1.resize(max(subgraph1.size(),subgraph2.size()),buf);
+    subgraph2.resize(max(subgraph1.size(),subgraph2.size()),buf);
+    for(int i = 0;i<max(subgraph1.size(),subgraph2.size());i++){
+        subgraph1[i].resize(max(subgraph1[i].size(),subgraph2[i].size()),0);
+        subgraph2[i].resize(max(subgraph1[i].size(),subgraph2[i].size()),0);
+
+        for(int ii=0;ii<max(subgraph1[i].size(),subgraph2[i].size());ii++){
+            if (subgraph1[i][ii] == 1) {
+                if (subgraph2[i][ii] != 1) {
+                   check= false;
+                   return check;
+                }
+            }
+        }
+    }
     return check;
 }
