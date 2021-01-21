@@ -14,9 +14,10 @@ using namespace std;
 
 vector<vector<int>> generateGraph(long long numOfVertices, long long numOfEdges);
 vector<vector<int>> generateGraph(long long numOfVertices);
-void generateDot(const vector<vector<int>> &graph, const string& filename);
+void generateDot(const vector<vector<int>> &graph, const string &filename);
+void generateColorDot(const vector<vector<int>> &graph, const vector<vector<int>> &subgraph, const string &filename);
 vector<vector<vector<int>>> getSubgraphs(const vector<vector<int>> &graph, long long int numOfEdges);
-void* getSubgraphsMulti(void *args);
+void *getSubgraphsMulti(void *args);
 vector<vector<int>> getSubgraph(const vector<vector<int>> &graph, long long first, long long numOfEdges);
 bool searchSubgraph(vector<vector<vector<int>>> allSubgraphs, vector<vector<int>> neededSubgraphs);
 void *searchSubgraphMulti(void *args);
@@ -24,55 +25,61 @@ bool compareSubgraph(vector<vector<int>> subgraph1, vector<vector<int>> subgraph
 vector<vector<int>> gs(const vector<vector<int>> &graph, long long first, long long numOfEdges);
 vector<vector<int>> validSubgraph(const vector<vector<int>> &graphs);
 vector<vector<int>> normalize(vector<int> &g);
+
 vector<vector<vector<int>>> allSubgraph;
-
 set<vector<vector<int>>> out;
-bool multiSearchCheck=false;
+bool multiSearchCheck = false;
 
-int threadNum=4;
+int threadNum = 4;
 sem_t q;
 bool iAmDolban = true;//help me!
 
 typedef struct someArgs_tag // создание структуры для передачи интервала для сортировки в массив
 {
-    int left,right,numOfEdges;
+    int left, right, numOfEdges;
     vector<vector<int>> graph;
 } someArgs_t;
 
 typedef struct someArgsSearch_tag // создание структуры для передачи интервала для сортировки в массив
 {
-    int left,right;
+    int left, right;
     vector<vector<vector<int>>> allSubgraphs;
     vector<vector<int>> neededSubgraphs;
 } someArgsSearch_t;
 
 int main() {
     double tm = omp_get_wtime();
-    const long long NUM_OF_VERTICES = 20 ;
+    const long long NUM_OF_VERTICES = 12;
     vector<vector<int>> graph = generateGraph(NUM_OF_VERTICES);
     generateDot(graph, "graph.dot");
-    vector<vector<int>> subgraph = getSubgraph(graph, 1, 10);
+    vector<vector<int>> subgraph = getSubgraph(graph, 1, 6);
     generateDot(subgraph, "subgraph.dot");
-    cout << (double)((long long)((omp_get_wtime() - tm) * 10)) / 10 << " s" << endl;
+    //cout << (double) ((long long) ((omp_get_wtime() - tm) * 10)) / 10 << " s" << endl;
 
     tm = omp_get_wtime();
-    vector<vector<vector<int>>> subgraphs = getSubgraphs(graph, 10);
+    vector<vector<vector<int>>> subgraphs = getSubgraphs(graph, 6);
 
-
-    if(iAmDolban){
-        for(int i = 0 ; i < subgraphs.size() ; i++){
-            string s="allSubgraphs/Subgraph ",numb;
+    if (iAmDolban) {
+        for (int i = 0; i < subgraphs.size(); i++) {
+            string s = "allSubgraphs/Subgraph ", numb;
             stringstream ss;
-            ss<<(i);
-            ss>>numb;
-            s+=numb;
-            s+=".dot";
+            ss << (i);
+            ss >> numb;
+            s += numb;
+            s += ".dot";
             generateDot(subgraphs[i], s);
         }
+
+        generateColorDot(graph, subgraph, "colorGraph.dot");
     }
 
-    cout << searchSubgraph(subgraphs,subgraph)<<"\n";
-    cout << (double)((long long)((omp_get_wtime() - tm) * 10)) / 10 << " s" << endl;
+    if (searchSubgraph(subgraphs, subgraph)) {
+        cout << "Subgraph was found\n";
+    } else {
+        cout << "Subgraph not found\n";
+    }
+
+    //cout << (double) ((long long) ((omp_get_wtime() - tm) * 10)) / 10 << " s" << endl;
     return 0;
 }
 
@@ -112,7 +119,7 @@ vector<vector<int>> generateGraph(long long numOfVertices) {
     return generateGraph(numOfVertices, numOfEdges);
 }
 
-void generateDot(const vector<vector<int>> &graph, const string& filename) {
+void generateDot(const vector<vector<int>> &graph, const string &filename) {
     ofstream fileOut(filename);
     fileOut << "graph {\n";
     long long len = graph.size();
@@ -140,29 +147,33 @@ void generateDot(const vector<vector<int>> &graph, const string& filename) {
 }
 
 vector<vector<vector<int>>> getSubgraphs(const vector<vector<int>> &graph, long long int numOfEdges) {
-   // set<vector<vector<int>>> out;
+    // set<vector<vector<int>>> out;
     ///todo отличное место для распарралеливания
 
     someArgs_t args[threadNum];
     pthread_t thread[threadNum];// "создание" потоков
     sem_init(&q, 0, 1);
     for (int i = 0; i < threadNum; i++) {
-        args[i].left=i*(graph.size()/threadNum);
-        if (i==threadNum-1)
-            args[i].right=graph.size();
-        else
-            args[i].right=(i+1)*(graph.size()/threadNum);
-        args[i].graph=graph;
-        args[i].numOfEdges=numOfEdges;
-        pthread_create(&thread[i], nullptr, getSubgraphsMulti, (void*) &args[i]);// передача в поток функции на выполнение и интервала "сортировки"
+        args[i].left = i * (graph.size() / threadNum);
+
+        if (i == threadNum - 1) {
+            args[i].right = graph.size();
+        } else {
+            args[i].right = (i + 1) * (graph.size() / threadNum);
+        }
+
+        args[i].graph = graph;
+        args[i].numOfEdges = numOfEdges;
+        pthread_create(&thread[i], nullptr, getSubgraphsMulti,
+                       (void *) &args[i]); // передача в поток функции на выполнение и интервала "сортировки"
     }
-    for (auto & i : thread) {
+    for (auto &i : thread) {
         pthread_join(i, nullptr);// запуск потоков
     }
     if (out.empty()) {
         return static_cast<vector<vector<vector<int>>>>(0);
     } else {
-        vector<vector<vector<int>>> v (out.begin(), out.end());
+        vector<vector<vector<int>>> v(out.begin(), out.end());
         return v;
     }
 }
@@ -211,21 +222,21 @@ vector<vector<int>> normalize(vector<int> &g) {
             subgraph[g[i + 1]][g[i]] = 1;
         }
 
-    }else{//  I am so sorry
-        int _max=0;
-        for(int i = 0; i < g.size(); i++)
-            _max=max(_max,g[i]);
+    } else {//  I am so sorry
+        int _max = 0;
+        for (int i = 0; i < g.size(); i++)
+            _max = max(_max, g[i]);
 
-        vector<int> ng(_max+1);
-        subgraph.reserve(_max+1);
-        for (int i = 0; i < _max+1; ++i) {
+        vector<int> ng(_max + 1);
+        subgraph.reserve(_max + 1);
+        for (int i = 0; i < _max + 1; ++i) {
             subgraph.push_back(ng);
         }
         for (int i = 0; i < g.size() - 1; i++) {
             subgraph[g[i]][g[i + 1]] = 1;
             subgraph[g[i + 1]][g[i]] = 1;
         }
-        int y =  9  ;
+        int y = 9;
     }
     return subgraph;
 }
@@ -238,7 +249,7 @@ vector<vector<int>> gs(const vector<vector<int>> &graph, long long int first, lo
         g.push_back(first);
         subgraphs.push_back(g);
     } else {
-        for (int i = 0 ; i < graph.size() ; ++i) {
+        for (int i = 0; i < graph.size(); ++i) {
             if (graph[first][i]) {
                 bufSubgraphs = gs(graph, i, numOfEdges - 1);
                 subgraphs.insert(subgraphs.end(), bufSubgraphs.begin(), bufSubgraphs.end());
@@ -248,7 +259,7 @@ vector<vector<int>> gs(const vector<vector<int>> &graph, long long int first, lo
         bufSubgraphs = subgraphs;
         subgraphs.clear();
 
-        for (auto & bufSubgraph : bufSubgraphs) {
+        for (auto &bufSubgraph : bufSubgraphs) {
             vector<int> buf;
             buf.push_back(first);
             buf.insert(buf.end(), bufSubgraph.begin(), bufSubgraph.end());
@@ -278,48 +289,45 @@ vector<vector<int>> validSubgraph(const vector<vector<int>> &graphs) {
 }
 
 bool searchSubgraph(vector<vector<vector<int>>> allSubgraphs, vector<vector<int>> neededSubgraphs) {
-    bool check=false;
-///todo отличное место для распарралеливания
-///todo херач фор и забей
-//#pragma omp parallel for num_threads(4) shared(check)
+    bool check = false;
     someArgsSearch_t args[threadNum];
     pthread_t thread[threadNum];// "создание" потоков
     sem_init(&q, 0, 1);
     for (int i = 0; i < threadNum; i++) {
-        args[i].left=i*(allSubgraphs.size()/threadNum);
-        if (i==threadNum-1)
-            args[i].right=allSubgraphs.size();
+        args[i].left = i * (allSubgraphs.size() / threadNum);
+        if (i == threadNum - 1)
+            args[i].right = allSubgraphs.size();
         else
-            args[i].right=(i+1)*(allSubgraphs.size()/threadNum);
-        args[i].allSubgraphs=allSubgraphs;
-        args[i].neededSubgraphs=neededSubgraphs;
-        pthread_create(&thread[i], nullptr, searchSubgraphMulti, (void*) &args[i]);// передача в поток функции на выполнение и интервала "сортировки"
+            args[i].right = (i + 1) * (allSubgraphs.size() / threadNum);
+        args[i].allSubgraphs = allSubgraphs;
+        args[i].neededSubgraphs = neededSubgraphs;
+        pthread_create(&thread[i], nullptr, searchSubgraphMulti,
+                       (void *) &args[i]); // передача в поток функции на выполнение и интервала "сортировки"
     }
-    for (auto & i : thread) {
-        pthread_join(i, nullptr);// запуск потоков
+    for (auto &i : thread) {
+        pthread_join(i, nullptr); // запуск потоков
     }
-    for(int i = 0 ; i < allSubgraphs.size(); i++ )
-        if (compareSubgraph(allSubgraphs[i],neededSubgraphs)){
-            check=true;
+    for (auto & allSubgraph : allSubgraphs)
+        if (compareSubgraph(allSubgraph, neededSubgraphs)) {
+            check = true;
         }
-
 
     return check;
 }
 
 bool compareSubgraph(vector<vector<int>> subgraph1, vector<vector<int>> subgraph2) {
-    bool check=true;
-    vector<int>  buf(max(subgraph1.size(),subgraph2.size()),0);
-    subgraph1.resize(max(subgraph1.size(),subgraph2.size()),buf);
-    subgraph2.resize(max(subgraph1.size(),subgraph2.size()),buf);
-    for(int i = 0;i<max(subgraph1.size(),subgraph2.size());i++){
-        subgraph1[i].resize(max(subgraph1[i].size(),subgraph2[i].size()),0);
-        subgraph2[i].resize(max(subgraph1[i].size(),subgraph2[i].size()),0);
+    bool check = true;
+    vector<int> buf(max(subgraph1.size(), subgraph2.size()), 0);
+    subgraph1.resize(max(subgraph1.size(), subgraph2.size()), buf);
+    subgraph2.resize(max(subgraph1.size(), subgraph2.size()), buf);
+    for (int i = 0; i < max(subgraph1.size(), subgraph2.size()); i++) {
+        subgraph1[i].resize(max(subgraph1[i].size(), subgraph2[i].size()), 0);
+        subgraph2[i].resize(max(subgraph1[i].size(), subgraph2[i].size()), 0);
 
-        for(int ii=0;ii<max(subgraph1[i].size(),subgraph2[i].size());ii++){
+        for (int ii = 0; ii < max(subgraph1[i].size(), subgraph2[i].size()); ii++) {
             if (subgraph1[i][ii] == 1) {
                 if (subgraph2[i][ii] != 1) {
-                    check= false;
+                    check = false;
                     return check;
                 }
             }
@@ -329,9 +337,9 @@ bool compareSubgraph(vector<vector<int>> subgraph1, vector<vector<int>> subgraph
 }
 
 void *getSubgraphsMulti(void *args) {
-    someArgs_t *arg = (someArgs_t*) args;
-    //vector<int> bufCount(N);//создание буферных массивов для каждого потока
-    for(int i = arg->left; i < arg->right; i++) {
+    someArgs_t *arg = (someArgs_t *) args;
+    //vector<int> bufCount(N); //создание буферных массивов для каждого потока
+    for (int i = arg->left; i < arg->right; i++) {
         vector<vector<int>> subgraphs = gs(arg->graph, i, arg->numOfEdges + 1);
         subgraphs = validSubgraph(subgraphs);
 
@@ -346,16 +354,48 @@ void *getSubgraphsMulti(void *args) {
 }
 
 void *searchSubgraphMulti(void *args) {
-    someArgsSearch_t *arg = (someArgsSearch_t*) args;
-    //vector<int> bufCount(N);//создание буферных массивов для каждого потока
-    for(int i = arg->left; i < arg->right; i++) {
-        if (compareSubgraph(arg->allSubgraphs[i],arg->neededSubgraphs)){
+    someArgsSearch_t *arg = (someArgsSearch_t *) args;
+    for (int i = arg->left; i < arg->right; i++) {
+        if (compareSubgraph(arg->allSubgraphs[i], arg->neededSubgraphs)) {
             sem_wait(&q);//если семафор открыт, то он закрывается, и поток подолжает выполнять код
             //если закрыт то поток ждёт
-            multiSearchCheck=true;
+            multiSearchCheck = true;
             sem_post(&q);//открытие семафора
         }
     }
     return nullptr;
 }
 
+void generateColorDot(const vector<vector<int>> &graph, const vector<vector<int>> &subgraph, const string &filename) {
+    ofstream fileOut(filename);
+    fileOut << "graph {\n";
+    long long len = graph.size();
+    long long subLen = subgraph.size();
+
+    for (long long i = 0; i < subLen; ++i) {
+        bool f = false;
+        for (long long ii = 0; ii < subLen; ++ii) {
+            if (subgraph[i][ii]) {
+                f = true;
+            }
+        }
+        if (f) {
+            fileOut << "    " + to_string(i) + " [color=red];" << endl;
+        }
+    }
+
+    for (long long i = 0; i < len; ++i) {
+        for (long long ii = i; ii < len; ++ii) {
+            if (graph[i][ii]) {
+                fileOut << "    " + to_string(i) + " -- " + to_string(ii);
+                if (subLen > i && subLen > ii && subgraph[i][ii]) {
+                    fileOut << " [color=red];" << endl;
+                } else {
+                    fileOut << ";" << endl;
+                }
+            }
+        }
+    }
+
+    fileOut << '}';
+}
