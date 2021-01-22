@@ -22,42 +22,53 @@ vector<vector<int>> gs(const vector<vector<int>> &graph, long long first, long l
 vector<vector<int>> validSubgraph(const vector<vector<int>> &graphs);
 vector<vector<int>> normalize(vector<int> &g);
 
-bool iAmDolban = true;//help me!
+bool iAmDolban = false;//help me!
+const int NUM_OF_TREADS = 1;
 
 int main() {
-    double tm = omp_get_wtime();
-    const long long NUM_OF_VERTICES = 12;
-    vector<vector<int>> graph = generateGraph(NUM_OF_VERTICES);
-    generateDot(graph, "graph.dot");
-    vector<vector<int>> subgraph = getSubgraph(graph, 1, 6);
-    generateDot(subgraph, "subgraph.dot");
-    //cout << (double) ((long long) ((omp_get_wtime() - tm) * 10)) / 10 << " s" << endl;
+    double tm; // = omp_get_wtime();
+    long long NUM_OF_VERTICES = 12;
+    long long NUM_OF_EDGES = 5;
+    double sum = 0;
 
-    tm = omp_get_wtime();
-    vector<vector<vector<int>>> subgraphs = getSubgraphs(graph, 6);
+    for (long long NUM_OF_VERTICES = 6; NUM_OF_VERTICES <= 18; NUM_OF_VERTICES+=2) {
+        for (int kk = 0; kk < 5; ++kk) {
+            vector<vector<int>> graph = generateGraph(NUM_OF_VERTICES);
+            //generateDot(graph, "graph.dot");
+            vector<vector<int>> subgraph = getSubgraph(graph, 1, NUM_OF_EDGES);
+            //generateDot(subgraph, "subgraph.dot");
+            //cout << (double) ((long long) ((omp_get_wtime() - tm) * 10)) / 10 << " s" << endl;
+
+            tm = omp_get_wtime();
+            vector<vector<vector<int>>> subgraphs = getSubgraphs(graph, NUM_OF_EDGES);
 
 
-    if (iAmDolban) {
-        for (int i = 0; i < subgraphs.size(); i++) {
-            string s = "allSubgraphs/Subgraph ", numb;
-            stringstream ss;
-            ss << (i);
-            ss >> numb;
-            s += numb;
-            s += ".dot";
-            generateDot(subgraphs[i], s);
+            if (iAmDolban) {
+                for (int i = 0; i < subgraphs.size(); i++) {
+                    string s = "allSubgraphs/Subgraph ", numb;
+                    stringstream ss;
+                    ss << (i);
+                    ss >> numb;
+                    s += numb;
+                    s += ".dot";
+                    generateDot(subgraphs[i], s);
+                }
+
+                generateColorDot(graph, subgraph, "colorGraph.dot");
+            }
+
+//            if (searchSubgraph(subgraphs, subgraph)) {
+//                cout << "Subgraph was found\n";
+//            } else {
+//                cout << "Subgraph not found\n";
+//            }
+
+            //cout << (double) ((long long) ((omp_get_wtime() - tm) * 1000)) / 1000 << " s" << endl;
+            sum += omp_get_wtime() - tm;
         }
 
-        generateColorDot(graph, subgraph, "colorGraph.dot");
+        cout << NUM_OF_VERTICES << ": " << (double) ((long long)(sum * 1000)) / 10000 << endl;
     }
-
-    if (searchSubgraph(subgraphs, subgraph)) {
-        cout << "Subgraph was found\n\n\n\n\n";
-    } else {
-        cout << "Subgraph not found\n";
-    }
-
-    //cout << (double) ((long long) ((omp_get_wtime() - tm) * 10)) / 10 << " s" << endl;
     return 0;
 }
 
@@ -126,7 +137,7 @@ void generateDot(const vector<vector<int>> &graph, const string &filename) {
 
 vector<vector<vector<int>>> getSubgraphs(const vector<vector<int>> &graph, long long int numOfEdges) {
     set<vector<vector<int>>> out;
-#pragma omp parallel for num_threads(4)
+#pragma omp parallel for num_threads(NUM_OF_TREADS)
     for (int i = 0; i < graph.size(); ++i) {
         vector<vector<int>> subgraphs = gs(graph, i, numOfEdges + 1);
         subgraphs = validSubgraph(subgraphs);
@@ -257,7 +268,7 @@ vector<vector<int>> validSubgraph(const vector<vector<int>> &graphs) {
 
 bool searchSubgraph(vector<vector<vector<int>>> allSubgraphs, const vector<vector<int>> &neededSubgraphs) {
     bool check = false;
-#pragma omp parallel for num_threads(4) shared(check)
+#pragma omp parallel for num_threads(NUM_OF_TREADS) shared(check)
     for (int i = 0; i < allSubgraphs.size(); ++i)
         if (compareSubgraph(allSubgraphs[i], neededSubgraphs)) {
             check = true;
